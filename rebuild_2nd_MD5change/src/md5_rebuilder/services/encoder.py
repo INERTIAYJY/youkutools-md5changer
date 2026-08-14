@@ -21,7 +21,7 @@ class VideoEncoder:
         self.ffmpeg = ffmpeg or ffmpeg_path()
         self._process: subprocess.Popen[bytes] | None = None
         self._lock = threading.Lock()
-        self._cancelled = False
+        self._cancel_event = threading.Event()
 
     def command_for(self, job: RenderJob) -> list[str]:
         profile = job.profile
@@ -60,27 +60,34 @@ class VideoEncoder:
         return cmd
 
     def encode(self, job: RenderJob, progress: ProgressFn | None = None) -> tuple[bool, str]:
-        self._cancelled = False
         command = self.command_for(job)
         logger.info("Encoding {} -> {}", job.source, job.target)
         lines: list[str] = []
         try:
+            if self._cancel_event.is_set():
+                raise EncodeCancelled()
             with self._lock:
                 self._process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            if self._cancel_event.is_set():
+                self._stop_process(self._process)
+                raise EncodeCancelled()
             assert self._process.stdout is not None
             duration = self._job_duration(job)
             for raw in iter(self._process.stdout.readline, b""):
                 line = raw.decode("utf-8", errors="replace").strip()
                 if line:
                     lines.append(line)
+                if self._cancel_event.is_set():
+                    break
                 percent = parse_progress(line, duration)
                 if percent is not None and progress:
                     progress(percent)
                 if self._process.poll() is not None:
                     break
-            code = self._process.wait()
-            if self._cancelled:
+            if self._cancel_event.is_set():
+                self._stop_process(self._process)
                 raise EncodeCancelled()
+            code = self._process.wait()
             if code == 0:
                 if progress:
                     progress(100.0)
@@ -98,9 +105,13 @@ class VideoEncoder:
                 self._process = None
 
     def cancel(self) -> None:
-        self._cancelled = True
+        self._cancel_event.set()
         with self._lock:
             process = self._process
+        self._stop_process(process)
+
+    @staticmethod
+    def _stop_process(process: subprocess.Popen[bytes] | None) -> None:
         if process and process.poll() is None:
             process.terminate()
             try:

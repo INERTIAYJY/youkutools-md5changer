@@ -23,7 +23,8 @@ class MediaProbe:
                 return meta
         return self._inspect_text(path)
 
-    def suggest_preset(self, meta: VideoMeta) -> ResolutionPreset:
+    @staticmethod
+    def suggest_preset(meta: VideoMeta) -> ResolutionPreset:
         portrait = meta.orientation == VideoOrientation.PORTRAIT
         if portrait:
             label = "1080p 竖版" if meta.height >= 1080 else "720p 竖版"

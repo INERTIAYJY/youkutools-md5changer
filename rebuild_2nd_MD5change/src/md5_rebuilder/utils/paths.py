@@ -56,9 +56,19 @@ def ffprobe_path() -> str | None:
     return find_tool("ffprobe")
 
 
+def resources_dir() -> Path | None:
+    package_dir = Path(__file__).resolve().parent.parent / "resources"
+    for candidate in [package_dir, runtime_root() / "resources", app_root() / "resources"]:
+        if candidate.is_dir():
+            return candidate
+    return None
+
+
 def icon_path() -> Path | None:
-    for path in [runtime_root() / "resources" / "app.ico", app_root() / "resources" / "app.ico"]:
-        if path.exists():
-            return path
+    base = resources_dir()
+    if base:
+        icon = base / "app.ico"
+        if icon.exists():
+            return icon
     return None
 

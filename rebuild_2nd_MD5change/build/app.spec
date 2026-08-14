@@ -5,7 +5,7 @@ from pathlib import Path
 ROOT = Path.cwd()
 datas = []
 
-resources_dir = ROOT / "resources"
+resources_dir = ROOT / "src" / "md5_rebuilder" / "resources"
 if resources_dir.exists():
     for path in resources_dir.iterdir():
         if path.is_file():
@@ -53,5 +53,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=str(ROOT / "resources" / "app.ico") if (ROOT / "resources" / "app.ico").exists() else None,
+    icon=str(ROOT / "src" / "md5_rebuilder" / "resources" / "app.ico") if (ROOT / "src" / "md5_rebuilder" / "resources" / "app.ico").exists() else None,
 )

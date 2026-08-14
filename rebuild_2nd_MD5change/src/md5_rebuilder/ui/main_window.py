@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, Qt, QTimer
@@ -42,6 +43,7 @@ from md5_rebuilder.core.models import (
     VideoOrientation,
 )
 from md5_rebuilder.services.planner import JobPlanner
+from md5_rebuilder.services.probe import MediaProbe
 from md5_rebuilder.ui.style import build_app_style
 from md5_rebuilder.ui.workers import EncodeThread, ProbeThread
 from md5_rebuilder.utils.config import SettingsStore
@@ -516,13 +518,7 @@ class MainWindow(QMainWindow):
         self._update_source_row(path, text)
         self._log(f"分析完成: {path.name} ({meta.width}x{meta.height})")
         if len(self.metas) == 1:
-            suggested = next(
-                preset.label
-                for preset in PRESETS
-                if preset.orientation == meta.orientation
-                and (("1080p" in preset.label and meta.height >= 1080) or ("720p" in preset.label and meta.height < 1080))
-            )
-            self.preset_combo.setCurrentText(suggested)
+            self.preset_combo.setCurrentText(MediaProbe.suggest_preset(meta).label)
             if meta.bitrate:
                 self.bitrate_spin.setValue(max(1.0, min(30.0, round(meta.bitrate / 1_000_000, 1))))
         self._sync_start_state()
@@ -577,6 +573,13 @@ class MainWindow(QMainWindow):
         if not metas:
             return
         profile = self.active_profile()
+        if (
+            profile.start_second is not None
+            and profile.end_second is not None
+            and profile.start_second >= profile.end_second
+        ):
+            QMessageBox.warning(self, "参数错误", "开始秒必须小于结束秒")
+            return
         if profile.output_dir:
             profile.output_dir.mkdir(parents=True, exist_ok=True)
         self.settings.save(
@@ -631,13 +634,17 @@ class MainWindow(QMainWindow):
         self._log(f"正在处理: {job.source.name}")
 
     def _job_progress(self, job_id: str, value: float) -> None:
-        job = self.jobs[job_id]
+        job = self.jobs.get(job_id)
+        if job is None:
+            return
         job.progress = value
         self._refresh_job(job)
         self._update_total_progress()
 
     def _job_done(self, job_id: str, ok: bool, message: str) -> None:
-        job = self.jobs[job_id]
+        job = self.jobs.get(job_id)
+        if job is None:
+            return
         job.state = JobState.DONE if ok else (JobState.CANCELLED if message == "用户已取消" else JobState.FAILED)
         job.message = message
         job.progress = 100.0 if ok else job.progress
@@ -694,9 +701,21 @@ class MainWindow(QMainWindow):
         self._sync_start_state()
         self._log("已取消当前任务")
 
+    def _wait_for_workers(self, timeout_ms: int = 4000) -> None:
+        """Wait for encoder threads to stop so QThread objects can be destroyed safely."""
+        workers = list(self.workers.values())
+        if not workers:
+            return
+        deadline = time.monotonic() + timeout_ms / 1000.0
+        for worker in workers:
+            remaining_ms = max(0, int((deadline - time.monotonic()) * 1000))
+            worker.wait(remaining_ms)
+        self.workers.clear()
+
     def clear_all(self) -> None:
         if self.running:
             self.cancel_all()
+        self._wait_for_workers()
         self.metas.clear()
         self.jobs.clear()
         self.source_list.clear()
@@ -768,5 +787,5 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event) -> None:  # noqa: N802
         if self.running:
             self.cancel_all()
-        QApplication.processEvents()
+        self._wait_for_workers()
         event.accept()

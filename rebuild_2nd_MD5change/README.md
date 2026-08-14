@@ -9,7 +9,7 @@
 - 主包名：`md5_rebuilder`
 - 主要入口：`main.py`、`python -m md5_rebuilder`
 - 打包产物：`dist\视频MD5重构工具.exe`
-- 默认配置文件：`~\.video_md5_changer\settings.json`
+- 默认配置文件：`~\.md5_rebuilder\settings.json`
 
 ## 主要功能
 
@@ -135,12 +135,12 @@ rebuild_2nd_MD5change
 ├─ build\                 PyInstaller spec 和打包脚本
 ├─ docs\                  架构说明
 ├─ ffmpeg_bin\            内置 FFmpeg/FFprobe 目录
-├─ resources\             图标和控件箭头资源
 ├─ src\
 │  ├─ run.py              PyInstaller 入口
 │  └─ md5_rebuilder\
 │     ├─ app.py           应用启动入口
 │     ├─ core\            数据模型、命名、MD5 等核心逻辑
+│     ├─ resources\       图标和控件箭头资源
 │     ├─ services\        视频探测、任务规划、编码执行
 │     ├─ ui\              PySide6 主窗口、样式、工作线程
 │     └─ utils\           配置、路径、日志、格式化工具

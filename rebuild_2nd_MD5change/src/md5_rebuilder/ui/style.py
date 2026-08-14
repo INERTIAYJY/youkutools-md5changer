@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from md5_rebuilder.utils.paths import runtime_root
+from md5_rebuilder.utils.paths import resources_dir
 
-DOWN_ARROW = (runtime_root() / "resources" / "chevron_down.xpm").as_posix()
-UP_ARROW = (runtime_root() / "resources" / "chevron_up.xpm").as_posix()
+_RES = resources_dir()
+DOWN_ARROW = (_RES / "chevron_down.xpm").as_posix() if _RES else ""
+UP_ARROW = (_RES / "chevron_up.xpm").as_posix() if _RES else ""
 
 THEMES = {
     "dark": {
