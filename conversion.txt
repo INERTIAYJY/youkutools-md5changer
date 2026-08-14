@@ -1,0 +1,266 @@
+================================================================================
+视频 MD5 更改工具 - 项目开发记录
+================================================================================
+
+项目位置: D:\opencode_project\MD5_change\video_md5_changer\
+打包输出: D:\opencode_project\MD5_change\video_md5_changer\dist\视频MD5更改工具V1.0.exe
+最终版本: V1.0
+最终大小: ~126 MB (单文件，含 ffmpeg)
+
+
+================================================================================
+1. 项目基础
+================================================================================
+
+技术栈:
+  - Python 3.13.13 + PySide6
+  - PyInstaller 6.20.0 (onefile 模式)
+  - FFmpeg 8.1 (gyan.dev full_build, ~218 MB 原始, 打包压缩后)
+  - loguru (日志)
+
+核心模块:
+  - core/ffmpeg_wrapper.py   FFmpeg 调用 + 编码设置
+  - core/task_manager.py     任务队列 + 文件命名
+  - core/video_analyzer.py   视频元信息解析
+  - ui/main_window.py        主窗口
+  - ui/settings_panel.py     设置面板 (含 DropdownButton 自定义控件)
+  - ui/file_list_widget.py   文件列表 + 拖拽
+  - ui/task_queue_widget.py  任务队列显示
+  - ui/theme.py              COLORS 调色板 + GLOBAL_STYLE
+
+设计风格:
+  - 暗色主题 + Adobe Premiere 紫色强调色 #892CFF
+  - 16px 圆角卡片 + QGraphicsDropShadowEffect 阴影
+  - 隐藏所有 1px 边框,只用背景色和阴影区分元素
+  - 字体: 微软雅黑, 标题 22px 700, 副标题 13px
+
+
+================================================================================
+2. 配置文件: SPEC.spec
+================================================================================
+
+关键参数:
+  - name = "视频MD5更改工具V1.0"   (改名绕过 Windows 图标缓存)
+  - icon = 'icon-V1.ico'           (7 尺寸多分辨率 ICO)
+  - version = 'version_info.txt'
+  - datas: ffmpeg_bin/ + icon-V1.ico (运行时可读)
+  - upx = True
+  - console = False (无控制台窗口)
+  - excludes: matplotlib/numpy/pandas/scipy (瘦身)
+
+
+================================================================================
+3. 调色板: ui/theme.py
+================================================================================
+
+COLORS = {
+    'bg_primary':    '#1A1A1F',
+    'bg_secondary':  '#232328',
+    'bg_card':       '#2A2A30',
+    'bg_card_hover': '#33333A',
+    'bg_input':      '#1F1F25',
+    'border':        '#3A3A42',
+    'text_primary':  '#F5F5F7',
+    'text_secondary':'#A8A8B3',
+    'text_muted':    '#6E6E78',
+    'accent':        '#892CFF',  # 紫色主调
+    'accent_hover':  '#A04DFF',
+    'accent_pressed':'#6B1FCC',
+    'success':       '#3DDC84',
+    'warning':       '#FFB547',
+    'warning_bg':    '#3A2D1F',
+    'error':         '#FF4D67',
+    'running':       '#5BC0FF',
+    'running_bg':    '#1F2D3A',
+}
+
+
+================================================================================
+4. 关键错误码: 3221225794
+================================================================================
+
+错误码: 0xC0000142 = STATUS_DLL_INIT_FAILED (DLL 找到了但初始化失败)
+
+【易混淆】
+  0xC0000135 = STATUS_DLL_NOT_FOUND (DLL 完全缺失)
+  0xC0000142 = STATUS_DLL_INIT_FAILED (DLL 找到了,初始化崩溃) ← 本项目遇到的
+
+【现象】用户在新机器上运行,第一个 FFmpeg 任务 18 秒后崩溃,第二个任务成功
+【根因】冷启动 + 杀毒软件/Windows Defender 拦截首次 DLL 加载
+
+【解决】3 道防线:
+  1. 启动时预热: 守护线程跑 ffmpeg.exe -version
+  2. 运行时重试: 检测到 0xC0000142 时 sleep 1.5s 后重试 1 次
+  3. 错误信息分类: 区分 DLL_INIT / DLL_NOT_FOUND / ACCESS_VIOLATION 等
+
+
+================================================================================
+5. FFmpeg 编码设置 (避免 WMP 报错)
+================================================================================
+
+原代码: -c:a copy (透传音频, 手机竖版视频的 HE-AAC/Opus WMP 不支持)
+新代码: -c:a aac -b:a 192k -ac 2 -ar 48000
+
+WMP 报错 0x80004005 (不支持的编码) 修复:
+  -c:v libx264 -pix_fmt yuv420p ...   (避免高色深问题)
+  -c:a aac -b:a 192k                   (WMP 原生支持)
+  -movflags +faststart                 (moov 移到文件头)
+
+
+================================================================================
+6. 文件命名逻辑 (Adobe 风格)
+================================================================================
+
+原目录模式:  {原名}_{分辨率}_{后缀}{counter}.mp4
+输出目录模式: {分辨率}_{后缀}{counter}.mp4
+
+【后缀规则 - ui/settings_panel.py】
+  - 用户填写内容 → 用填写内容作为后缀
+  - 留空 → 默认后缀 "new" (与旧的 _NEW 大写一致但小写)
+
+【计数器规则 - core/task_manager.py】
+  is_custom_suffix = True  (用户填了后缀):
+    第一次:    video_1080p横_V2.mp4        (无 counter)
+    冲突 1 次: video_1080p横_V2_1.mp4
+    冲突 2 次: video_1080p横_V2_2.mp4
+
+  is_custom_suffix = False (留空, 默认):
+    永远带 counter:
+    video_1080p横_new1.mp4
+    video_1080p横_new2.mp4
+
+
+================================================================================
+7. 拖拽导入 (整个窗口)
+================================================================================
+
+【修复前】只在 file_list_widget 内部 drop_frame 区域可拖拽
+【修复后】整个主窗口任意位置可拖拽
+
+实现: main.py + main_window.py
+  - QApplication.setWindowIcon + window.setWindowIcon
+  - MainWindow.installEventFilter(self) + eventFilter() 处理 DragEnter/DragMove/DragLeave/Drop
+
+
+================================================================================
+8. 自动码率检测 (新增)
+================================================================================
+
+【需求】导入第一个视频后,自动把该视频的码率设为默认输出码率
+
+【实现】ui/settings_panel.py 新增 set_bitrate_mbps(mbps)
+  - 自动 clamp 到 [1.0, 30.0] Mbps
+  - 同步 bitrate_input (QLineEdit) + bitrate_slider (Slider)
+  - 强制切回 CBR 模式 (因为 VBR 用 CRF 不需要 bitrate)
+  - blockSignals 防无限循环
+
+【触发位置】ui/main_window.py:_analyze_single_file
+  if len(self.file_analysis_results) == 1:
+      if info.bitrate and info.bitrate > 0:
+          detected_mbps = round(info.bitrate / 1_000_000.0, 1)
+          self.settings_panel.set_bitrate_mbps(detected_mbps)
+
+【注】info.bitrate 是 ffmpeg 输出的容器总码率 (含音频), 与纯视频流码率差 1-2%
+
+
+================================================================================
+9. 弹窗策略
+================================================================================
+
+启动时:  保留 FFmpeg 未找到警告 (关键, 不删)
+运行完成: 原计划改 inline status, 用户中途换话题没完成
+取消确认: 保留 (破坏性操作, 不删)
+
+
+================================================================================
+10. 图标系统
+================================================================================
+
+【源文件】icon-V1.png (1024x1024 RGB, 279 KB)
+【转换】PIL → icon-V1.ico (7 尺寸, 48 KB):
+  16x16, 24x24, 32x32, 48x48, 64x64, 128x128, 256x256
+
+【图标显示位置】
+  1. EXE 文件图标 (File Explorer)        ← PyInstaller icon= 参数
+  2. 窗口标题栏左上角                     ← QApplication.setWindowIcon + window.setWindowIcon
+  3. 任务栏图标 (运行时)                  ← 同上
+  4. Alt-Tab 切换器                       ← 同上
+
+【Windows 图标缓存陷阱】
+  即使新 exe 嵌入了正确图标, Windows 可能仍显示旧图标 (ThumbsDB/IconCache)
+  解决: 改文件名 (本项目: VideoMD5Changer.exe → 视频MD5更改工具V1.0.exe)
+
+【运行时加载】main.py:_get_app_icon()
+  查找顺序:
+    1. sys._MEIPASS/icon-V1.ico     (PyInstaller 解压目录)
+    2. exe 同目录/icon-V1.ico       (单文件模式可选用)
+    3. 源码目录/icon-V1.ico         (开发模式)
+
+
+================================================================================
+11. 部署 / 跨电脑使用
+================================================================================
+
+【单文件部署】dist/视频MD5更改工具V1.0.exe 自包含:
+  - Python 解释器 (PyInstaller bootloader)
+  - PySide6 运行时
+  - ffmpeg.exe (~218 MB, 打包压缩)
+  - icon-V1.ico
+
+【目标电脑要求】
+  - Windows 10/11 64-bit
+  - 无需安装 Python / FFmpeg / VC++ Redistributable
+  - 无需任何外部文件
+
+【首次运行可能的小问题】
+  - 杀毒软件可能误报 (建议加白名单)
+  - 首次 DLL 加载可能慢 (已加预热 + 自动重试)
+
+
+================================================================================
+12. 已知问题 / 待办
+================================================================================
+
+[ ] 运行时完成弹窗 → 改为 inline 状态文字 (用户中途换话题未实施)
+[ ] info.bitrate 是总码率 (含音频), 严格场景应取视频流单独码率
+[ ] 中文文件名在某些 ffmpeg 版本下需要 -i "file" 加引号 (已加, 但建议测试)
+
+
+================================================================================
+13. 关键修改文件清单
+================================================================================
+
+main.py                                 + QIcon 运行时加载
+ui/main_window.py                       + eventFilter 拖拽, + prewarm
+ui/settings_panel.py                    + suffix_input, + set_bitrate_mbps
+ui/file_list_widget.py                  (未改, 保留内层 drop_frame)
+core/ffmpeg_wrapper.py                  + prewarm/retry/describe_return_code, AAC/yuv420p/faststart
+core/task_manager.py                    + suffix/is_custom_suffix 参数
+core/video_analyzer.py                  (未改)
+ui/theme.py                             (未改, 沿用最初配色)
+SPEC.spec                               + icon=icon-V1.ico, + datas 打包 ico, 改 exe 名
+icon-V1.png / icon-V1.ico               + 新增图标资源
+version_info.txt                        (未改)
+
+
+================================================================================
+14. 常用命令
+================================================================================
+
+打包:
+  cd D:\opencode_project\MD5_change\video_md5_changer
+  python -m PyInstaller SPEC.spec --clean --noconfirm
+
+清理:
+  Remove-Item -Recurse -Force dist, build
+
+日志位置:
+  C:\Users\<用户名>\.video_md5_changer\logs\app.log
+
+打包结果:
+  dist\视频MD5更改工具V1.0.exe  (约 126 MB, 单文件)
+
+
+================================================================================
+END
+================================================================================

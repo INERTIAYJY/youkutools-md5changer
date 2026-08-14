@@ -1,0 +1,33 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+*.egg
+
+# ---- 测试缓存 ----
+.pytest_cache/
+verify_tmp/
+
+# ---- PyInstaller 打包产物 (保留 build/app.spec 与 build/build.bat) ----
+**/build/app/
+**/dist/
+*.manifest
+
+# ---- 运行时数据 ----
+.runtime/
+*.log
+
+# ---- 内置 FFmpeg 二进制 (约 220MB, 不入库, 见 ffmpeg_bin/README.md) ----
+**/ffmpeg_bin/*
+!**/ffmpeg_bin/README.md
+
+# ---- 本地工具配置 ----
+.agents/
+.codex/
+
+# ---- IDE / 系统 ----
+.idea/
+.vscode/
+Thumbs.db
+Desktop.ini
