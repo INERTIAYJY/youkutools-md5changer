@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
+from loguru import logger
 from PySide6.QtCore import QEvent, Qt, QTimer
 from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import (
@@ -30,12 +31,11 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from loguru import logger
 
 from md5_rebuilder.core.hashing import md5_file
 from md5_rebuilder.core.models import (
-    JobState,
     PRESETS,
+    JobState,
     RateControl,
     RenderJob,
     RenderProfile,

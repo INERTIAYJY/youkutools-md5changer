@@ -140,4 +140,3 @@ def _fps(value: Any) -> float:
         return float(Fraction(str(value)))
     except Exception:
         return 0.0
-

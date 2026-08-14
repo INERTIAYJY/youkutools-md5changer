@@ -71,4 +71,3 @@ def icon_path() -> Path | None:
         if icon.exists():
             return icon
     return None
-

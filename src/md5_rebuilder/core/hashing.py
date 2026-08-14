@@ -13,4 +13,3 @@ def md5_file(path: Path, chunk_size: int = 1024 * 1024) -> str | None:
     except OSError:
         return None
     return digest.hexdigest()
-

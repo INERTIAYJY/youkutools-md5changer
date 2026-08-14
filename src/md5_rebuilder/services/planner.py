@@ -30,4 +30,3 @@ def _bump(path: Path) -> Path:
         base, number = stem.rsplit("_", 1)
         return path.with_name(f"{base}_{int(number) + 1}{path.suffix}")
     return path.with_name(f"{stem}_1{path.suffix}")
-

@@ -16,4 +16,3 @@ def size_text(bytes_count: int | float) -> str:
             return f"{value:.1f} {unit}" if unit != "B" else f"{int(value)} B"
         value /= 1024
     return f"{value:.1f} GB"
-

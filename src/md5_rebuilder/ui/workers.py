@@ -38,4 +38,3 @@ class EncodeThread(QThread):
 
     def cancel(self) -> None:
         self.encoder.cancel()
-

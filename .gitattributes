@@ -1,0 +1,16 @@
+# 仓库内统一规范：文本文件归一化为 LF
+* text=auto
+
+*.py text eol=lf
+*.md text eol=lf
+*.toml text eol=lf
+*.txt text eol=lf
+*.ini text eol=lf
+*.xpm text eol=lf
+*.spec text eol=lf
+
+# Windows 批处理脚本保持 CRLF
+*.bat text eol=crlf
+
+# 二进制资源
+*.ico binary

@@ -22,4 +22,3 @@ def main() -> None:
         window.setWindowIcon(QIcon(str(icon)))
     window.show()
     sys.exit(app.exec())
-
